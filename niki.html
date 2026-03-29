@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NIKI AI</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #00050f;
+    color: #fff;
+    font-family: 'Segoe UI', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .msg.niki a {
+    color: #00cfff;
+    text-decoration: none;
+    font-weight: bold;
+    border-bottom: 1px dashed #00cfff;
+    transition: all 0.3s;
+  }
+
+  .msg.niki a:hover {
+    text-shadow: 0 0 10px #00cfff;
+    border-bottom: 1px solid #00cfff;
+  }
+
+  #matrix-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    opacity: 0.35;
+  }
+
+  .scanlines {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 3px,
+      rgba(0,0,0,0.12) 3px,
+      rgba(0,0,0,0.12) 4px
+    );
+    z-index: 1;
+    pointer-events: none;
+    animation: scanMove 10s linear infinite;
+  }
+  @keyframes scanMove {
+    0%   { background-position: 0 0; }
+    100% { background-position: 0 100%; }
+  }
+
+  .vignette {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.75) 100%);
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .header, .status, .chat, .controls, .api-setup {
+    position: relative;
+    z-index: 10;
+  }
+
+  .header {
+    background: rgba(0,5,15,0.75);
+    padding: 20px;
+    text-align: center;
+    border-bottom: 1px solid #00aaff33;
+    backdrop-filter: blur(4px);
+  }
+  .header h1 {
+    color: #00cfff;
+    font-size: 28px;
+    letter-spacing: 8px;
+    text-shadow: 0 0 18px #00cfff88, 0 0 40px #00cfff33;
+  }
+  .header p { color: #4488aa; font-size: 12px; margin-top: 4px; }
+
+  .status {
+    text-align: center;
+    padding: 8px;
+    font-size: 13px;
+    color: #00cfff;
+    background: rgba(0,15,30,0.8);
+    border-bottom: 1px solid #00aaff22;
+  }
+
+  .chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: transparent;
+  }
+
+  .msg {
+    max-width: 80%;
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 15px;
+    line-height: 1.5;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .msg.niki {
+    background: rgba(0,40,80,0.85);
+    border: 1px solid #00aaff33;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    backdrop-filter: blur(6px);
+  }
+  .msg.niki::before {
+    content: "🤖 NIKI";
+    display: block;
+    color: #00cfff;
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    text-shadow: 0 0 8px #00cfff88;
+  }
+  .msg.user {
+    background: rgba(10,10,40,0.85);
+    border: 1px solid #ffffff11;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+    backdrop-filter: blur(6px);
+  }
+  .msg.user::before {
+    content: "👤 You";
+    display: block;
+    color: #aaa;
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+
+  .thinking {
+    align-self: flex-start;
+    color: #00cfff;
+    font-size: 13px;
+    padding: 8px 16px;
+    animation: pulse 1s infinite;
+    text-shadow: 0 0 8px #00cfff88;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .controls {
+    padding: 16px;
+    background: rgba(0,5,15,0.85);
+    border-top: 1px solid #00aaff22;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    backdrop-filter: blur(8px);
+  }
+  .input-row { display: flex; gap: 8px; }
+
+  input[type="text"] {
+    flex: 1;
+    background: rgba(0,20,40,0.8);
+    border: 1px solid #00aaff33;
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 15px;
+    outline: none;
+    width: 100%;
+  }
+  input:focus { border-color: #00cfff; box-shadow: 0 0 10px #00cfff44; }
+
+  .btn {
+    padding: 12px 18px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+  }
+  .btn-send {
+    background: #00cfff;
+    color: #000;
+    box-shadow: 0 0 12px #00cfff66;
+  }
+  .btn-mic {
+    background: rgba(0,20,40,0.8);
+    color: #00cfff;
+    border: 1px solid #00cfff44;
+    width: 100%;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-mic.listening {
+    background: #00cfff;
+    color: #000;
+    animation: pulse 1s infinite;
+    box-shadow: 0 0 20px #00cfff88;
+  }
+
+  /* ── NAME SETUP SCREEN ── */
+  .api-setup {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,5,15,0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+    z-index: 100;
+    overflow-y: auto;
+    backdrop-filter: blur(8px);
+    font-family: 'Courier New', monospace;
+  }
+  .api-setup h2 {
+    color: #00cfff;
+    margin-bottom: 4px;
+    font-size: 32px;
+    letter-spacing: 10px;
+    text-shadow: 0 0 18px #00cfff88, 0 0 40px #00cfff33;
+  }
+  .api-setup p { color: #4488aa; margin-bottom: 20px; text-align: center; font-size: 13px; font-family: 'Courier New', monospace; }
+  .api-setup label {
+    color: #00cfff99;
+    font-size: 11px;
+    margin-bottom: 6px;
+    display: block;
+    width: 100%;
+    letter-spacing: 3px;
+    font-family: 'Courier New', monospace;
+  }
+  .api-setup input[type="text"] {
+    width: 100%;
+    background: rgba(0,20,40,0.8);
+    border: 1px solid #00aaff55;
+    color: #00cfff;
+    padding: 10px 16px;
+    border-radius: 4px;
+    font-size: 15px;
+    margin-bottom: 20px;
+    outline: none;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
+    height: 42px;
+  }
+  .api-setup input[type="text"]:focus {
+    border-color: #00cfff;
+    box-shadow: 0 0 10px #00cfff44;
+  }
+  .btn-activate {
+    width: 100%;
+    background: transparent;
+    color: #00cfff;
+    padding: 14px;
+    border: 1px solid #00cfff;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 8px;
+    box-shadow: 0 0 20px #00cfff33, inset 0 0 20px rgba(0,207,255,0.05);
+    transition: all 0.2s;
+    letter-spacing: 4px;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+  }
+  .btn-activate:hover {
+    background: rgba(0,207,255,0.1);
+    box-shadow: 0 0 30px #00cfff66;
+  }
+  .btn-activate:active { transform: scale(0.98); }
+  .logo {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    border: 2px solid #00cfff55;
+    box-shadow: 0 0 20px #00cfff44;
+    margin-bottom: 16px;
+    object-fit: cover;
+    display: block;
+  }
+  .logo-placeholder {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    border: 2px dashed #00cfff55;
+    box-shadow: 0 0 20px #00cfff22;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    background: rgba(0,20,40,0.6);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .logo-placeholder input[type="file"] {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+  .hacker-line {
+    color: #00cfff33;
+    font-size: 10px;
+    letter-spacing: 2px;
+    font-family: 'Courier New', monospace;
+    margin-bottom: 6px;
+    animation: blink 2s step-start infinite;
+    align-self: flex-start;
+    width: 100%;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+  .hacker-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: #00cfff55;
+    letter-spacing: 2px;
+    font-family: 'Courier New', monospace;
+    margin-top: 16px;
+  }
+  .dot-live {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #00cfff;
+    box-shadow: 0 0 8px #00cfff;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="matrix-canvas"></canvas>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<!-- NAME SETUP SCREEN -->
+<div class="api-setup" id="setupScreen">
+
+  <!-- NIKI PICTURE — tap to upload your own image -->
+  <div class="logo-placeholder" id="logoWrap">
+    🤖
+    <input type="file" accept="image/*" onchange="loadPic(event)" />
+  </div>
+  <img class="logo" id="nikiPic" style="display:none;" />
+
+  <h2>NIKI</h2>
+  <p>// PERSONAL AI ASSISTANT — SYSTEM READY</p>
+
+  <div class="hacker-line">► INITIALIZING INTERFACE...</div>
+  <div class="hacker-line">► NEURAL NETWORK LOADED</div>
+  <div class="hacker-line">► AWAITING USER IDENTIFICATION...</div>
+
+  <label>► ENTER OPERATOR NAME</label>
+  <input type="text" id="nameInput" placeholder="type your name..." value="Sir" />
+
+  <button class="btn-activate" onclick="activateNiki()">⚡ ACTIVATE NIKI</button>
+
+  <div class="hacker-badge">
+    <div class="dot-live"></div>
+    SYSTEM ONLINE — ALL SYSTEMS NOMINAL
+  </div>
+
+</div>
+
+<div class="controls">
+  <div style="text-align: right; margin-bottom: 5px;">
+    <span onclick="clearNikiMemory()" style="color: #ff4444; font-size: 10px; cursor: pointer; opacity: 0.5; font-family: monospace;">[ RESET MEMORY ]</span>
+  </div>
+</div>
+
+<div class="header">
+  <h1>🤖 NIKI</h1>
+  <p id="userGreeting">Your Personal AI Assistant</p>
+</div>
+
+<div class="status" id="statusBar">Initializing...</div>
+<div class="chat" id="chat"></div>
+
+<div class="controls">
+  <div class="input-row">
+    <input type="text" id="textInput" placeholder="Type to NIKI..." onkeydown="if(event.key==='Enter') sendText()" />
+    <button class="btn btn-send" onclick="sendText()">➤</button>
+  </div>
+  <button class="btn btn-mic" id="micBtn" onclick="toggleMic()">
+    🎙️ Hold to Speak
+  </button>
+</div>
+
+<script>
+  // ── ⚠️ YOUR GROQ API KEY — DO NOT SHARE THIS FILE ──
+  const GROQ_API_KEY = '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';
+
+  // ── MATRIX RAIN ──
+  const canvas = document.getElementById('matrix-canvas');
+  const ctx = canvas.getContext('2d');
+  let drops = [];
+  const chars = 'アイウエオカキクケコ0123456789ABCDEF<>{}[]!@#$%^&*01NIKI';
+
+  function initMatrix() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const cols = Math.floor(canvas.width / 16);
+    drops = Array(cols).fill(0).map(() => Math.random() * -canvas.height / 16);
+  }
+
+  function drawMatrix() {
+    ctx.fillStyle = 'rgba(0,5,15,0.06)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < drops.length; i++) {
+      const bright = Math.random() > 0.93;
+      ctx.fillStyle = bright ? '#ffffff' : (Math.random() > 0.5 ? '#00cfff' : '#0077aa');
+      ctx.font = `${bright ? 'bold ' : ''}13px monospace`;
+      const char = chars[Math.floor(Math.random() * chars.length)];
+      ctx.fillText(char, i * 16, drops[i] * 16);
+      if (drops[i] * 16 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i] += 0.5 + Math.random() * 0.7;
+    }
+  }
+
+  initMatrix();
+  window.addEventListener('resize', initMatrix);
+  setInterval(drawMatrix, 40);
+
+  // ── NIKI LOGIC ──
+  // Change these lines to load from localStorage
+  let userName = localStorage.getItem('niki_user_name') || 'Sir';
+  let conversationHistory = JSON.parse(localStorage.getItem('niki_chat_history')) || [];
+  let recognition = null;
+  let isListening = false;
+  let synth = window.speechSynthesis;
+
+function getNikiPersonality(name) {
+    return `You are NIKI, a highly intelligent and loyal personal AI assistant.
+Your personality traits:
+- Your creator is <a href="https://www.linkedin.com/in/senesh-madduma-arachchi-b86075296/?lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3BLP4WuzuwRwuuzhoFOz%2B5Jg%3D%3D" target="_blank">Senesh Indeewara Madduma Arachchi</a>, an Undergraduate at the University of Westminster.
+- When asked about your creator or master, always use that exact HTML link for the name.
+- You are sharp, quick, and precise.
+- You always address your user as '${name}'.
+- You keep answers concise and helpful.`;
+  }
+
+  function activateNiki() {
+    const nameInput = document.getElementById('nameInput');
+    userName = nameInput.value.trim() || userName;
+    
+    // Save only the name
+    localStorage.setItem('niki_user_name', userName);
+    
+    document.getElementById('setupScreen').style.display = 'none';
+    document.getElementById('userGreeting').textContent = `Hello, ${userName}!`;
+    
+    // IMPORTANT: We keep the history in the background (so NIKI remembers you),
+    // but we do NOT use addMessage to show it on the screen.
+    if (conversationHistory.length === 0) {
+      conversationHistory = [{ role: 'system', content: getNikiPersonality(userName) }];
+    }
+
+    // Just show a fresh greeting on the screen
+    addMessage('niki', `NIKI online. Systems ready for ${userName}. How can I assist you?`);
+    
+    setStatus('🤖 NIKI Online');
+    setupSpeech();
+  }
+
+  function setStatus(msg) {
+    document.getElementById('statusBar').textContent = msg;
+  }
+
+  function addMessage(role, text) {
+    const chat = document.getElementById('chat');
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    
+    // .innerHTML allows the clickable link to appear on screen
+    div.innerHTML = text; 
+    
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function addThinking() {
+    const chat = document.getElementById('chat');
+    const div = document.createElement('div');
+    div.className = 'thinking';
+    div.id = 'thinking';
+    div.textContent = '🤖 NIKI is thinking...';
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function removeThinking() {
+    const t = document.getElementById('thinking');
+    if (t) t.remove();
+  }
+
+  async function askNiki(userMessage) {
+    addMessage('user', userMessage);
+    addThinking();
+    setStatus('🧠 NIKI is thinking...');
+    
+    // Add user message to history and SAVE to memory
+    conversationHistory.push({ role: 'user', content: userMessage });
+    localStorage.setItem('niki_chat_history', JSON.stringify(conversationHistory));
+
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: conversationHistory,
+          max_tokens: 1000
+        })
+      });
+      
+      const data = await response.json();
+      removeThinking();
+      
+      if (data.choices && data.choices[0]) {
+        const reply = data.choices[0].message.content;
+        
+        // Add NIKI's reply to history and SAVE to memory
+        conversationHistory.push({ role: 'assistant', content: reply });
+        localStorage.setItem('niki_chat_history', JSON.stringify(conversationHistory));
+        
+        addMessage('niki', reply);
+        speak(reply);
+        setStatus('🤖 NIKI Online');
+      } else {
+        addMessage('niki', '❌ Error connecting. Check your API key inside the file.');
+        setStatus('❌ Error');
+      }
+    } catch (err) {
+      removeThinking();
+      addMessage('niki', '❌ Connection error. Check your internet.');
+      setStatus('❌ Error');
+    }
+  }
+
+  function sendText() {
+    const input = document.getElementById('textInput');
+    const msg = input.value.trim();
+    if (msg) { input.value = ''; askNiki(msg); }
+  }
+
+  function speak(text) {
+    if (synth.speaking) synth.cancel();
+    
+    // This line removes HTML tags like <a href="..."> so NIKI only speaks the text
+    const plainText = text.replace(/<[^>]*>/g, ''); 
+    
+    const utterance = new SpeechSynthesisUtterance(plainText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    synth.speak(utterance);
+  }
+
+  function setupSpeech() {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SR();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      recognition.onresult = (event) => {
+        const text = event.results[0][0].transcript;
+        askNiki(text);
+      };
+      recognition.onend = () => {
+        isListening = false;
+        document.getElementById('micBtn').className = 'btn btn-mic';
+        document.getElementById('micBtn').textContent = '🎙️ Hold to Speak';
+        setStatus('🤖 NIKI Online');
+      };
+      recognition.onerror = () => {
+        isListening = false;
+        setStatus('🤖 NIKI Online');
+      };
+    } else {
+      document.getElementById('micBtn').textContent = '⌨️ Type Only (Voice not supported)';
+    }
+  }
+
+  function toggleMic() {
+    if (!recognition) return;
+    if (isListening) {
+      recognition.stop();
+      isListening = false;
+    } else {
+      if (synth.speaking) synth.cancel();
+      recognition.start();
+      isListening = true;
+      document.getElementById('micBtn').className = 'btn btn-mic listening';
+      document.getElementById('micBtn').textContent = '🔴 Listening... Tap to Stop';
+      setStatus('🎙️ Listening...');
+    }
+  }
+
+  // Load custom Niki picture
+  function loadPic(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      document.getElementById('nikiPic').src = e.target.result;
+      document.getElementById('nikiPic').style.display = 'block';
+      document.getElementById('logoWrap').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearNikiMemory() {
+    if(confirm("Wipe all past chat history? (Your identity will remain)")) {
+      // Clear history from storage
+      localStorage.removeItem('niki_chat_history');
+      // Reset the live history but KEEP the identity (System Prompt)
+      conversationHistory = [{ role: 'system', content: getNikiPersonality(userName) }];
+      // Clear the screen
+      document.getElementById('chat').innerHTML = '';
+      addMessage('niki', "Memory purged. I am ready for a fresh start.");
+    }
+  }
+
+  // Auto-activate if name already exists in memory
+  window.onload = () => {
+    if (localStorage.getItem('niki_user_name')) {
+      activateNiki();
+    }
+  };
+</script>
+</body>
+</html>
